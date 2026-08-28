@@ -27,7 +27,10 @@ export function useLiveQuote(symbol: string | null) {
         setQuote(q);
         setError(null);
         setHistory((prev) => {
-          const next = [...prev, { time: q.timestamp || Date.now(), price: q.current }];
+          // Use local receive time, not Finnhub's trade timestamp (q.timestamp):
+          // on the free tier it can repeat across polls (stale last-trade time),
+          // which collapses the chart's x-axis domain to a single instant.
+          const next = [...prev, { time: Date.now(), price: q.current }];
           return next.length > MAX_POINTS ? next.slice(next.length - MAX_POINTS) : next;
         });
       } catch (err) {

@@ -42,6 +42,7 @@ export interface PortfolioState {
   cash: number;
   holdings: Record<string, Holding>;
   trades: Trade[];
+  lastResetAt: number | null;
 }
 
 export interface NewsArticle {

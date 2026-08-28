@@ -10,31 +10,33 @@ export function TradeHistory({ trades }: { trades: Trade[] }) {
   }
 
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>Time</th>
-          <th>Symbol</th>
-          <th>Side</th>
-          <th>Shares</th>
-          <th>Price</th>
-          <th>Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        {trades.slice(0, 20).map((t) => (
-          <tr key={t.id}>
-            <td>{new Date(t.timestamp).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</td>
-            <td>{t.symbol}</td>
-            <td>
-              <span className={`side-tag ${t.side}`}>{t.side}</span>
-            </td>
-            <td>{t.shares}</td>
-            <td>${fmt(t.price)}</td>
-            <td>${fmt(t.shares * t.price)}</td>
+    <div className="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Symbol</th>
+            <th>Side</th>
+            <th>Shares</th>
+            <th>Price</th>
+            <th>Total</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {trades.slice(0, 20).map((t) => (
+            <tr key={t.id}>
+              <td>{new Date(t.timestamp).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</td>
+              <td>{t.symbol}</td>
+              <td>
+                <span className={`side-tag ${t.side}`}>{t.side}</span>
+              </td>
+              <td>{t.shares}</td>
+              <td>${fmt(t.price)}</td>
+              <td>${fmt(t.shares * t.price)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

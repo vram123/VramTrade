@@ -1,84 +1,108 @@
+import { useState } from "react";
 import {
   Area,
   AreaChart,
-  CartesianGrid,
+  ReferenceDot,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import type { PricePoint } from "../types";
+import type { MouseHandlerDataParam } from "recharts";
+import type { PricePoint, Quote } from "../types";
 
-function fmtTime(t: number) {
-  return new Date(t).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
-function fmtPrice(p: number) {
-  return p.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function ChartTooltip({ active, payload }: any) {
-  if (!active || !payload?.length) return null;
-  const point: PricePoint = payload[0].payload;
+function PulseDot({ cx, cy, color }: { cx?: number; cy?: number; color: string }) {
+  if (cx == null || cy == null) return null;
   return (
-    <div className="chart-tooltip">
-      <div className="t-price">${fmtPrice(point.price)}</div>
-      <div className="t-time">{fmtTime(point.time)}</div>
-    </div>
+    <g>
+      <circle cx={cx} cy={cy} r={9} fill={color} opacity={0.25} className="chart-live-pulse" />
+      <circle cx={cx} cy={cy} r={3.5} fill={color} stroke="var(--surface-1)" strokeWidth={1.5} />
+    </g>
   );
 }
 
-export function PriceChart({ data }: { data: PricePoint[] }) {
+export function PriceChart({
+  data,
+  quote,
+  onScrub,
+}: {
+  data: PricePoint[];
+  quote?: Quote | null;
+  onScrub?: (point: PricePoint | null) => void;
+}) {
+  const [hovering, setHovering] = useState(false);
+
   if (data.length < 2) {
     return <div className="chart-empty">Collecting live ticks…</div>;
   }
 
-  const up = data[data.length - 1].price >= data[0].price;
+  const up = quote ? quote.change >= 0 : data[data.length - 1].price >= data[0].price;
   const color = up ? "var(--good-fill)" : "var(--critical)";
   const prices = data.map((d) => d.price);
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const pad = (max - min) * 0.1 || max * 0.001 || 1;
+  // Anchor the range to the real intraday high/low (not just whatever ticks
+  // we've polled so far) so small live-tick jitter doesn't get exaggerated
+  // into a dramatic swing.
+  const dayLow = quote ? Math.min(quote.low, quote.prevClose) : Infinity;
+  const dayHigh = quote ? Math.max(quote.high, quote.prevClose) : -Infinity;
+  const min = Math.min(...prices, dayLow);
+  const max = Math.max(...prices, dayHigh);
+  const pad = (max - min) * 0.12 || max * 0.001 || 1;
+  const firstTime = data[0].time;
+  const lastTime = data[data.length - 1].time;
+  const last = data[data.length - 1];
 
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <AreaChart data={data} margin={{ top: 10, right: 12, bottom: 0, left: 0 }}>
+    <ResponsiveContainer width="100%" height={300}>
+      <AreaChart
+        data={data}
+        margin={{ top: 16, right: 0, bottom: 0, left: 0 }}
+        onMouseMove={(state: MouseHandlerDataParam) => {
+          // activeIndex is a numeric string (Recharts' TooltipIndex type), not a number.
+          const idx = state.activeIndex != null ? Number(state.activeIndex) : NaN;
+          if (!Number.isNaN(idx) && data[idx]) {
+            setHovering(true);
+            onScrub?.(data[idx]);
+          }
+        }}
+        onMouseLeave={() => {
+          setHovering(false);
+          onScrub?.(null);
+        }}
+      >
         <defs>
           <linearGradient id="priceFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.1} />
+            <stop offset="0%" stopColor={color} stopOpacity={0.25} />
             <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid vertical={false} stroke="var(--gridline)" strokeDasharray="0" />
-        <XAxis
-          dataKey="time"
-          tickFormatter={fmtTime}
-          stroke="var(--baseline)"
-          tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-          minTickGap={40}
-          axisLine={{ stroke: "var(--baseline)" }}
-          tickLine={false}
+        <XAxis hide dataKey="time" type="number" scale="time" domain={[firstTime, lastTime]} />
+        <YAxis hide domain={[min - pad, max + pad]} />
+        {quote && (
+          <ReferenceLine y={quote.prevClose} stroke="var(--baseline)" strokeDasharray="3 3" strokeWidth={1} />
+        )}
+        <Tooltip
+          content={() => null}
+          cursor={{ stroke: "var(--baseline)", strokeWidth: 1, strokeDasharray: "4 4" }}
         />
-        <YAxis
-          domain={[min - pad, max + pad]}
-          tickFormatter={(v: number) => v.toFixed(2)}
-          stroke="var(--baseline)"
-          tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-          axisLine={false}
-          tickLine={false}
-          width={64}
-        />
-        <Tooltip content={<ChartTooltip />} cursor={{ stroke: "var(--baseline)", strokeWidth: 1 }} />
         <Area
           type="monotone"
           dataKey="price"
           stroke={color}
-          strokeWidth={2}
+          strokeWidth={2.5}
+          strokeLinecap="round"
           fill="url(#priceFill)"
           dot={false}
-          activeDot={{ r: 4, fill: color, stroke: "var(--surface-1)", strokeWidth: 2 }}
+          activeDot={{ r: 5, fill: color, stroke: "var(--surface-1)", strokeWidth: 2 }}
           isAnimationActive={false}
         />
+        {!hovering && (
+          <ReferenceDot
+            x={last.time}
+            y={last.price}
+            shape={(props: { cx?: number; cy?: number }) => <PulseDot {...props} color={color} />}
+          />
+        )}
       </AreaChart>
     </ResponsiveContainer>
   );

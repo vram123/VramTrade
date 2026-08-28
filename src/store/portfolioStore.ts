@@ -3,17 +3,20 @@ import { persist } from "zustand/middleware";
 import type { Holding, PortfolioState, Trade } from "../types";
 
 const STARTING_CASH = 10_000;
+const RESET_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface PortfolioActions {
   buy: (symbol: string, shares: number, price: number) => { ok: boolean; error?: string };
   sell: (symbol: string, shares: number, price: number) => { ok: boolean; error?: string };
-  reset: () => void;
+  reset: () => { ok: boolean; error?: string };
+  msUntilResetAllowed: () => number;
 }
 
 const initialState: PortfolioState = {
   cash: STARTING_CASH,
   holdings: {},
   trades: [],
+  lastResetAt: null,
 };
 
 export const usePortfolioStore = create<PortfolioState & PortfolioActions>()(
@@ -87,7 +90,25 @@ export const usePortfolioStore = create<PortfolioState & PortfolioActions>()(
         return { ok: true };
       },
 
-      reset: () => set({ ...initialState, trades: [] }),
+      reset: () => {
+        const { lastResetAt } = get();
+        const elapsed = lastResetAt ? Date.now() - lastResetAt : Infinity;
+        if (elapsed < RESET_COOLDOWN_MS) {
+          const daysLeft = Math.ceil((RESET_COOLDOWN_MS - elapsed) / (24 * 60 * 60 * 1000));
+          return {
+            ok: false,
+            error: `You can reset your portfolio again in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`,
+          };
+        }
+        set({ ...initialState, lastResetAt: Date.now() });
+        return { ok: true };
+      },
+
+      msUntilResetAllowed: () => {
+        const { lastResetAt } = get();
+        if (!lastResetAt) return 0;
+        return Math.max(0, RESET_COOLDOWN_MS - (Date.now() - lastResetAt));
+      },
     }),
     { name: "vramtrade-portfolio" },
   ),
