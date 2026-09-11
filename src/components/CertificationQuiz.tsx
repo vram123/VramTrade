@@ -11,16 +11,10 @@ export interface QuizResult {
 
 export function CertificationQuiz({
   questions,
-  title = "Section quiz",
-  exitLabel = "Exit quiz",
   onFinish,
-  onExit,
 }: {
   questions: QuizQuestion[];
-  title?: string;
-  exitLabel?: string;
   onFinish: (result: QuizResult) => void;
-  onExit: () => void;
 }) {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(() => questions.map(() => null));
@@ -48,14 +42,7 @@ export function CertificationQuiz({
   };
 
   return (
-    <div className="settings-page quiz-page">
-      <div className="settings-page-header">
-        <button className="back-btn" onClick={onExit}>
-          ← {exitLabel}
-        </button>
-        <h1>{title}</h1>
-      </div>
-
+    <div className="quiz-embed">
       <div className="card quiz-progress-card">
         <div className="guides-progress-label">
           <span>
